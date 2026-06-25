@@ -1,0 +1,200 @@
+{
+  "id": "triaje-siniestros",
+  "name": "Triaje de Siniestros — Agente IA",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Ejecutar Todos los Casos",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [50, 100]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "return [\n  { json: { body: { aviso: 'Se reporta robo con fractura de ventanal en sucursal de farmacia. Póliza POL-2024-003. Sustrajeron equipos computacionales. Valor estimado 300 UF. Sin heridos.' } } },\n  { json: { body: { aviso: 'Colisión de vehículo de flota en Ruta 68. Póliza POL-2024-002. Daño estimado 800 UF. Conductor ileso.' } } },\n  { json: { body: { aviso: 'Explosión en caldera de edificio industrial. Daño estructural severo en el ala norte. Póliza POL-2024-001. Estimación preliminar: 8000 UF. Dos trabajadores con quemaduras leves evacuados al hospital.' } } },\n  { json: { body: { aviso: 'Cliente llama para avisar que chocaron su auto estacionado. No tiene el número de póliza a mano. Dice que el daño es considerable pero no sabe el monto.' } } },\n  { json: { body: { aviso: 'Daños en edificio comercial de 5 pisos tras sismo de magnitud 6.2 en Concepción. Póliza POL-2024-001. Grietas visibles en muros y desprendimiento de cielo. Monto por evaluar. No se reportan heridos.' } } },\n  { json: { body: { aviso: 'Filtración de agua en oficina del tercer piso. Daño a servidores y mobiliario. Póliza POL-2024-099. Monto estimado 1200 UF.' } } }\n];"
+      },
+      "id": "code-casos-prueba",
+      "name": "Casos de Prueba",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [250, 100]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "triaje-siniestro",
+        "responseMode": "lastNode"
+      },
+      "id": "webhook-trigger",
+      "name": "Recibir Aviso de Siniestro",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    },
+    {
+      "parameters": {
+        "agent": "conversationalAgent",
+        "promptType": "define",
+        "text": "={{ $json.body.aviso }}",
+        "options": {
+          "systemMessage": "Eres un agente de triaje de siniestros para una compañía de seguros en Chile.\n\nCuando recibes un aviso de siniestro:\n1. Extrae el número de póliza del texto.\n2. Usa la herramienta 'Buscar Póliza' para verificar estado y ramo.\n3. Si la póliza NO está vigente, responde que el siniestro no puede procesarse y detente.\n4. Si está vigente, clasifica la severidad:\n   - Baja: menor a 500 UF\n   - Media: entre 500 y 2000 UF\n   - Alta: mayor a 2000 UF\n5. Usa 'Buscar Liquidador' para asignar según ramo y severidad.\n6. Responde con formato:\n   PÓLIZA: [número]\n   ESTADO: [vigente/vencida]\n   RAMO: [ramo]\n   SEVERIDAD: [baja/media/alta]\n   LIQUIDADOR: [nombre y cargo]\n   OBSERVACIONES: [notas relevantes]\n\nSi el monto supera 2000 UF, agrega AVISO REASEGURADOR.\nSi hay heridos, clasificar siempre como Alta.\nNunca inventes datos. Si falta información, solicítala."
+        }
+      },
+      "id": "ai-agent",
+      "name": "Agente de Triaje",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "model": "models/gemini-2.5-flash",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "gemini-model",
+      "name": "Gemini 2.5 Flash",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [400, 500],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "1",
+          "name": "Google Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "Buscar_Poliza",
+        "description": "Busca una póliza por su número y retorna estado, ramo, suma asegurada y deducible. Usar siempre que el aviso mencione un número de póliza.",
+        "language": "javaScript",
+        "jsCode": "const polizas = {\n  \"POL-2024-001\": { estado: \"Vigente\", ramo: \"Incendio\", suma_asegurada: \"500.000.000 CLP\", deducible: \"10 UF\", asegurado: \"Industrias del Pacifico SpA\" },\n  \"POL-2024-002\": { estado: \"Vencida\", ramo: \"Vehiculo\", suma_asegurada: \"25.000.000 CLP\", deducible: \"3 UF\", asegurado: \"Transportes Ruta Sur Ltda.\" },\n  \"POL-2024-003\": { estado: \"Vigente\", ramo: \"Responsabilidad Civil\", suma_asegurada: \"200.000.000 CLP\", deducible: \"5 UF\", asegurado: \"Farmacias del Centro S.A.\" },\n  \"POL-2024-004\": { estado: \"Vigente\", ramo: \"Transporte\", suma_asegurada: \"150.000.000 CLP\", deducible: \"8 UF\", asegurado: \"Logistica Andes SpA\" }\n};\nconst match = query.match(/POL-\\d{4}-\\d{3}/);\nconst numero = match ? match[0] : query.trim();\nconst resultado = polizas[numero];\nreturn JSON.stringify(resultado || { estado: \"No encontrada\", mensaje: \"Poliza no existe en el sistema\" });"
+      },
+      "id": "tool-buscar-poliza",
+      "name": "Buscar Póliza",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [550, 500]
+    },
+    {
+      "parameters": {
+        "name": "Buscar_Liquidador",
+        "description": "Busca y asigna un liquidador según el ramo del siniestro y su severidad. Enviar como texto con formato 'ramo,severidad', ejemplo: 'Incendio,Alta'. Ramos válidos: Incendio, Responsabilidad Civil, Transporte. Severidades: Alta, Media, Baja.",
+        "language": "javaScript",
+        "jsCode": "const q = String(query || '');\nlet ramo = '';\nlet severidad = 'Media';\ntry {\n  const parsed = JSON.parse(q);\n  ramo = parsed.ramo || '';\n  severidad = parsed.severidad || 'Media';\n} catch(e) {\n  const parts = q.split(',').map(s => s.trim());\n  if (parts.length >= 2) { ramo = parts[0]; severidad = parts[1]; }\n  else { ramo = q.trim(); }\n}\nconst asignaciones = {\n  'Incendio|Alta': { liquidador: 'Maria Gonzalez', cargo: 'Liquidador Senior - Incendio', telefono: '+56 9 8765 4321', email: 'mgonzalez@proteccion-nacional.cl' },\n  'Incendio|Media': { liquidador: 'Carlos Ruiz', cargo: 'Liquidador - Incendio', telefono: '+56 9 1234 5678', email: 'cruiz@proteccion-nacional.cl' },\n  'Incendio|Baja': { liquidador: 'Pool General', cargo: 'Asignacion automatica', telefono: 'Mesa central: +56 2 2345 6789', email: 'siniestros@proteccion-nacional.cl' },\n  'Responsabilidad Civil|Alta': { liquidador: 'Andrea Soto', cargo: 'Liquidador Senior - RC', telefono: '+56 9 5555 1234', email: 'asoto@proteccion-nacional.cl' },\n  'Responsabilidad Civil|Media': { liquidador: 'Pool General', cargo: 'Asignacion automatica', telefono: 'Mesa central: +56 2 2345 6789', email: 'siniestros@proteccion-nacional.cl' },\n  'Responsabilidad Civil|Baja': { liquidador: 'Pool General', cargo: 'Asignacion automatica', telefono: 'Mesa central: +56 2 2345 6789', email: 'siniestros@proteccion-nacional.cl' },\n  'Transporte|Alta': { liquidador: 'Roberto Mendez', cargo: 'Liquidador Senior - Transporte', telefono: '+56 9 7777 8888', email: 'rmendez@proteccion-nacional.cl' },\n  'Transporte|Media': { liquidador: 'Pool General', cargo: 'Asignacion automatica', telefono: 'Mesa central: +56 2 2345 6789', email: 'siniestros@proteccion-nacional.cl' }\n};\nconst key = ramo + '|' + severidad;\nconst resultado = asignaciones[key];\nreturn JSON.stringify(resultado || { liquidador: 'Pool General', cargo: 'Asignacion manual requerida', telefono: 'Mesa central: +56 2 2345 6789', email: 'siniestros@proteccion-nacional.cl' });"
+      },
+      "id": "tool-buscar-liquidador",
+      "name": "Buscar Liquidador",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [700, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "Alta",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ]
+        }
+      },
+      "id": "if-alta-severidad",
+      "name": "¿Severidad Alta?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const fs = require('fs');\nconst filePath = '/data/alertas_reaseguro.md';\nconst output = $('Agente de Triaje').item.json.output || '';\nconst now = new Date().toISOString().replace('T', ' ').substring(0, 19);\nconst polMatch = output.match(/PÓLIZA:\\s*([^\\n]+)/);\nconst poliza = polMatch ? polMatch[1].trim() : 'N/A';\nconst ramoMatch = output.match(/RAMO:\\s*([^\\n]+)/);\nconst ramo = ramoMatch ? ramoMatch[1].trim() : 'N/A';\nconst obsMatch = output.match(/OBSERVACIONES:\\s*([^\\n]+)/);\nconst obs = obsMatch ? obsMatch[1].trim() : '';\nconst row = `| ${now} | ${poliza} | ${ramo} | Alta | ${obs} |`;\nif (!fs.existsSync(filePath)) {\n  const header = '# Alertas Reaseguro\\n\\n| Fecha | Póliza | Ramo | Severidad | Observaciones |\\n|-------|--------|------|-----------|---------------|\\n';\n  fs.writeFileSync(filePath, header);\n}\nfs.appendFileSync(filePath, row + '\\n');\nreturn [{ json: { output } }];"
+      },
+      "id": "code-alerta-reaseguro",
+      "name": "Alerta Reaseguro",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 200]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const fs = require('fs');\nconst filePath = '/data/log_triaje.md';\nconst output = $('Agente de Triaje').item.json.output || '';\nconst now = new Date().toISOString().replace('T', ' ').substring(0, 19);\nconst polMatch = output.match(/PÓLIZA:\\s*([^\\n]+)/);\nconst poliza = polMatch ? polMatch[1].trim() : 'N/A';\nconst sevMatch = output.match(/SEVERIDAD:\\s*([^\\n]+)/);\nconst severidad = sevMatch ? sevMatch[1].trim() : 'N/A';\nconst liqMatch = output.match(/LIQUIDADOR:\\s*([^\\n]+)/);\nconst liquidador = liqMatch ? liqMatch[1].trim() : 'N/A';\nconst row = `| ${now} | ${poliza} | ${severidad} | ${liquidador} |`;\nif (!fs.existsSync(filePath)) {\n  const header = '# Log de Triaje\\n\\n| Fecha | Póliza | Severidad | Liquidador |\\n|-------|--------|-----------|------------|\\n';\n  fs.writeFileSync(filePath, header);\n}\nfs.appendFileSync(filePath, row + '\\n');\nreturn [{ json: { output } }];"
+      },
+      "id": "code-registro-log",
+      "name": "Registro Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 400]
+    }
+  ],
+  "connections": {
+    "Ejecutar Todos los Casos": {
+      "main": [
+        [{"node": "Casos de Prueba", "type": "main", "index": 0}]
+      ]
+    },
+    "Casos de Prueba": {
+      "main": [
+        [{"node": "Agente de Triaje", "type": "main", "index": 0}]
+      ]
+    },
+    "Recibir Aviso de Siniestro": {
+      "main": [
+        [{"node": "Agente de Triaje", "type": "main", "index": 0}]
+      ]
+    },
+    "Gemini 2.5 Flash": {
+      "ai_languageModel": [
+        [{"node": "Agente de Triaje", "type": "ai_languageModel", "index": 0}]
+      ]
+    },
+    "Buscar Póliza": {
+      "ai_tool": [
+        [{"node": "Agente de Triaje", "type": "ai_tool", "index": 0}]
+      ]
+    },
+    "Buscar Liquidador": {
+      "ai_tool": [
+        [{"node": "Agente de Triaje", "type": "ai_tool", "index": 0}]
+      ]
+    },
+    "Agente de Triaje": {
+      "main": [
+        [{"node": "¿Severidad Alta?", "type": "main", "index": 0}]
+      ]
+    },
+    "¿Severidad Alta?": {
+      "main": [
+        [
+          {"node": "Alerta Reaseguro", "type": "main", "index": 0},
+          {"node": "Registro Log", "type": "main", "index": 0}
+        ],
+        [
+          {"node": "Registro Log", "type": "main", "index": 0}
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Agente de triaje de siniestros con Gemini. Incluye 6 casos de prueba que se ejecutan al hacer clic en 'Execute workflow'. También acepta avisos individuales via webhook.",
+    "notes": "La credencial de Gemini se provisiona automaticamente al iniciar el contenedor desde la variable GOOGLE_API_KEY. Los resultados se escriben en archivos markdown locales en /data/ (montado como volumen Docker). El nodo 'Ejecutar Todos los Casos' dispara los 6 casos de prueba. El webhook sigue disponible para uso externo."
+  }
+}

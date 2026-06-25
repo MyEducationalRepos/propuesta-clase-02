@@ -1,0 +1,8 @@
+.env
+!.env.copy
+.history/
+__pycache__/
+.venv/
+*.pyc
+.uv/
+.DS_Store

@@ -1,0 +1,24 @@
+services:
+  adk:
+    build:
+      context: examples/adk
+    env_file: .env
+
+  n8n:
+    build:
+      context: examples/n8n
+    env_file: .env
+    ports:
+      - "5678:5678"
+    volumes:
+      - ./data:/data
+    environment:
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - GENERIC_TIMEZONE=America/Santiago
+      - N8N_SECURE_COOKIE=false
+      - N8N_INSTANCE_OWNER_MANAGED_BY_ENV=true
+      - N8N_INSTANCE_OWNER_EMAIL=admin@clase.local
+      - N8N_INSTANCE_OWNER_FIRST_NAME=Admin
+      - N8N_INSTANCE_OWNER_LAST_NAME=Clase
+      - N8N_INSTANCE_OWNER_PASSWORD_HASH=$$2a$$10$$7Ro7TyF1DUmy.7YGUg30DukOYdcMu0OJ9MwgNPukC3Y8hCzt2N1qG
+      - NODE_FUNCTION_ALLOW_BUILTIN=fs

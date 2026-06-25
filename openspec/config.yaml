@@ -1,0 +1,19 @@
+schema: spec-driven
+
+context: |
+  Teaching materials repo for Insurex Class 2: "IA que actua: introduccion a la inteligencia artificial agentica".
+  Audience: insurance professionals (managers, not developers). Content must be visual, managerial-oriented.
+  Tech stack: Docker (only host dependency), Python >=3.11 inside container (uv for deps), Google ADK (google-adk), n8n (official Docker image), Gemini models.
+  Constraint: Everything runs inside Docker containers. No local Python, uv, or n8n installs. Lean Dockerfiles, no bloat.
+  Domain: Chilean insurance industry. Company "Proteccion Nacional". Claims triage agent example.
+  Existing files: ejemplo_agente_adk.py (ADK agent), ejemplo_workflow_n8n.json (n8n workflow), clase_02_fundamentos_ia_parte_b.md (lesson plan).
+  All API keys stored in .env (never committed). Provide .env.copy with placeholder guidance.
+  Language: Spanish for user-facing content (RAE orthography), English for code comments and docs.
+
+rules:
+  proposal:
+    - Keep proposals under 500 words
+    - Focus on classroom usability and managerial audience
+  tasks:
+    - Break tasks into chunks of max 1 hour
+    - Each task should be independently testable

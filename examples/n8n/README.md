@@ -188,6 +188,14 @@ Windows no siempre incluye curl. Alternativas:
 
 La variable `GOOGLE_API_KEY` en el archivo `.env` no está definida o es incorrecta. Verifica que el archivo `.env` contenga una clave válida y reinicia el contenedor con `docker compose down && docker compose up n8n`.
 
+### "No response received" en el chat
+
+Si el chat muestra `[No response received. This could happen if streaming is enabled in the trigger but disabled in agent node(s)]`, el workflow de chat tiene un modo de respuesta incompatible. El workflow incluido usa `lastNode` para devolver la clasificación del agente después del registro en log. Reconstruye el contenedor para importar la versión corregida:
+
+```bash
+docker compose down && docker compose up n8n --build
+```
+
 ### El agente responde con un error o no responde
 
 Verifica que:

@@ -5,7 +5,7 @@
     {
       "parameters": {
         "options": {
-          "responseMode": "streaming"
+          "responseMode": "lastNode"
         }
       },
       "id": "chat-trigger",
